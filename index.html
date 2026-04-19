@@ -476,11 +476,28 @@ async function loadSheet() {
     if (!res.ok) throw new Error('Could not reach sheet. Make sure it is set to anyone with the link can view.');
 
     const text = await res.text();
-    const rows = text.trim().split('\n').map(line =>
-      line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(cell =>
-        cell.replace(/^"|"$/g, '').replace(/""/g, '"').trim()
-      )
-    ).filter(r => r.length >= 2);
+
+    function parseCSVLine(line) {
+      const result = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i+1] === '"') { cur += '"'; i++; }
+          else inQuotes = !inQuotes;
+        } else if (ch === ',' && !inQuotes) {
+          result.push(cur.trim());
+          cur = '';
+        } else {
+          cur += ch;
+        }
+      }
+      result.push(cur.trim());
+      return result;
+    }
+
+    const rows = text.trim().split('\n').map(parseCSVLine).filter(r => r.length >= 2);
 
     const firstCell = (rows[0]?.[0] || '').toLowerCase().trim();
     const isHeader  = isNaN(firstCell) || firstCell === 'id' || firstCell === 'learner_id';
