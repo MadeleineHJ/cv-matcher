@@ -446,10 +446,9 @@ Claude will read all CVs from the sheet and rank every candidate against this ro
 // ─────────────────────────────────────────────
 // CONFIGURATION
 // ─────────────────────────────────────────────
-const CLAUDE_KEY  = "PASTE_YOUR_ANTHROPIC_KEY_HERE";
-const GAPI_KEY    = "PASTE_YOUR_GOOGLE_API_KEY_HERE";
-const SHEET_ID    = "PASTE_YOUR_SHEET_ID_HERE";
-const SHEET_RANGE = "T4J Learners Resumes!A:B";
+const CLAUDE_KEY = "PASTE_YOUR_ANTHROPIC_KEY_HERE";
+const SHEET_ID   = "PASTE_YOUR_SHEET_ID_HERE";
+const SHEET_TAB  = "T4J Learners Resumes";
 // ─────────────────────────────────────────────
 
 let loadedCVs = [];
@@ -471,19 +470,20 @@ async function loadSheet() {
   statusEl.textContent = 'Loading CVs from sheet...';
 
   try {
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(SHEET_ID)}/values/${encodeURIComponent(SHEET_RANGE)}?key=${encodeURIComponent(GAPI_KEY)}`;
-    const res = await fetch(url);
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(SHEET_TAB)}`;
+    const res = await fetch(csvUrl);
 
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.error?.message || 'HTTP ' + res.status);
-    }
+    if (!res.ok) throw new Error('Could not reach sheet. Make sure it is set to anyone with the link can view.');
 
-    const data = await res.json();
-    const rows = (data.values || []).filter(r => r.length >= 2);
+    const text = await res.text();
+    const rows = text.trim().split('\n').map(line =>
+      line.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map(cell =>
+        cell.replace(/^"|"$/g, '').replace(/""/g, '"').trim()
+      )
+    ).filter(r => r.length >= 2);
 
     const firstCell = (rows[0]?.[0] || '').toLowerCase().trim();
-    const isHeader  = firstCell === 'id' || firstCell === 'learner_id' || firstCell === 'extracted text' || isNaN(firstCell);
+    const isHeader  = isNaN(firstCell) || firstCell === 'id' || firstCell === 'learner_id';
     const start     = isHeader ? 1 : 0;
 
     loadedCVs = rows.slice(start).map(r => ({
@@ -491,7 +491,7 @@ async function loadSheet() {
       cv: String(r[1]).trim()
     })).filter(r => r.id && r.cv);
 
-    if (loadedCVs.length === 0) throw new Error('No data found. Check sheet config.');
+    if (loadedCVs.length === 0) throw new Error('No data found. Check the sheet tab name and sharing settings.');
 
     statusEl.textContent = `${loadedCVs.length.toLocaleString()} CVs loaded`;
 
