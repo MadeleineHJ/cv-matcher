@@ -446,8 +446,9 @@ Claude will read all CVs from the sheet and rank every candidate against this ro
 // ─────────────────────────────────────────────
 // CONFIGURATION
 // ─────────────────────────────────────────────
-const SHEET_ID   = "1F3gHSDieHMG-T2PYSt5Yb5UlXWjob7wlb_saNocepeE";
-const SHEET_TAB  = "T4J Learners Resumes";
+const SHEET_ID    = "1TEsMq5rP_4ODW_I-p97Py5E0antpXy0d-NTv1zQEHHw";
+const SHEET_TAB   = "T4J Learners Resumes";
+const GAPI_KEY    = "PASTE_YOUR_GOOGLE_API_KEY_HERE";
 // ─────────────────────────────────────────────
 
 let loadedCVs = [];
@@ -469,20 +470,27 @@ async function loadSheet() {
   statusEl.textContent = 'Loading CVs from sheet...';
 
   try {
-    const jsonUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(SHEET_TAB)}`;
-    const res = await fetch(jsonUrl);
-    if (!res.ok) throw new Error('Could not reach sheet. Make sure it is set to anyone with the link can view.');
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(SHEET_ID)}/values/${encodeURIComponent(SHEET_TAB + '!A:B')}?key=${encodeURIComponent(GAPI_KEY)}`;
+    const res = await fetch(url);
 
-    const text = await res.text();
-    const json = JSON.parse(text.replace(/^[^{]*/, '').replace(/[^}]*$/, ''));
-    const rows = json.table.rows;
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'HTTP ' + res.status);
+    }
 
-    loadedCVs = rows.map(r => ({
-      id: String(r.c[0]?.v ?? '').trim(),
-      cv: String(r.c[1]?.v ?? '').trim()
+    const data = await res.json();
+    const rows = (data.values || []).filter(r => r.length >= 2);
+
+    const firstCell = (rows[0]?.[0] || '').toLowerCase().trim();
+    const isHeader  = firstCell === 'id' || firstCell === 'learner_id' || isNaN(firstCell);
+    const start     = isHeader ? 1 : 0;
+
+    loadedCVs = rows.slice(start).map(r => ({
+      id: String(r[0]).trim(),
+      cv: String(r[1]).trim()
     })).filter(r => r.id && r.cv);
 
-    if (loadedCVs.length === 0) throw new Error('No data found. Check the sheet tab name and sharing settings.');
+    if (loadedCVs.length === 0) throw new Error('No data found. Check sheet tab name and sharing settings.');
 
     statusEl.textContent = `${loadedCVs.length.toLocaleString()} CVs loaded`;
 
