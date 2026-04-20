@@ -15,9 +15,11 @@ jobs:
         uses: actions/checkout@v4
 
     
+
       - name: Inject secrets into HTML
         run: |
           sed -i "s|PASTE_YOUR_SHEET_ID_HERE|${{ secrets.SHEET_ID }}|g" index.html
+          sed -i "s|PASTE_YOUR_GOOGLE_API_KEY_HERE|${{ secrets.GAPI_KEY }}|g" index.html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
