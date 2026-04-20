@@ -582,42 +582,6 @@ Rules:
   }
 }
 
-    if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error?.message || 'API error ' + response.status);
-    }
-
-    setProgress(true, 'Claude is analyzing all CVs...', 45);
-
-    const reader  = response.body.getReader();
-    const decoder = new TextDecoder();
-    let fullText  = '';
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      for (const line of decoder.decode(value, { stream: true }).split('\n')) {
-        if (!line.startsWith('data: ')) continue;
-        const raw = line.slice(6).trim();
-        if (raw === '[DONE]') continue;
-        try {
-          const p = JSON.parse(raw);
-          if (p.type === 'content_block_delta' && p.delta?.text) fullText += p.delta.text;
-        } catch {}
-      }
-    }
-
-    setProgress(true, 'Rendering results...', 90);
-    renderResults(fullText);
-
-  } catch (err) {
-    showError(err.message);
-  } finally {
-    setLoading(false);
-    setProgress(false);
-  }
-}
-
 function renderResults(text) {
   $('progress-wrap').classList.remove('visible');
   const scroll = $('results-scroll');
